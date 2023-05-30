@@ -1,0 +1,23 @@
+version: "3.6"
+
+services:
+  mysql:
+    image: mysql
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_HOST: localhost
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      MYSQL_DATABASE: mydb
+    volumes:
+      - app_db
+
+volumes:
+  app_db:
+
+networks:
+  nt_mysql:
+    driver: bridge
