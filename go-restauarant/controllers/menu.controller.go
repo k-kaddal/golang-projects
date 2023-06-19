@@ -3,7 +3,9 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +23,51 @@ var menuCollection *mongo.Collection = database.OpenCollection(database.Client, 
 var validate = validator.New()
 
 func GetMenus() gin.HandlerFunc{
-	return func(c *gin.Context){}
+	return func(c *gin.Context){
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+
+		recordPerPage, err := strconv.Atoi(c.Query("recordPerPage"))
+		if err != nil || recordPerPage<1{
+			recordPerPage=10
+		}
+
+		page, err := strconv.Atoi(c.Query("page"))
+		if err != nil || page<1{
+			page=1
+		}
+		
+		startIndex := (page-1) * recordPerPage
+		startIndex, err = strconv.Atoi(c.Query("startIndex"))
+		
+		matchStage := bson.D{{"$match"}, bson.D{{}}}
+		groupStage := bson.D{{"$group", bson.D{{"_id", bson.D{{"_id", "null"}}}, {"total_count", bson.D{{"$sum, 1"}}},{"data",bson.D{{"$push", "$$ROOT"}}} }}}
+		projectStage := bson.D{
+			{
+				"$project", bson.D{
+					{"_id",0},
+					{"total_count", 1},
+					{"food_items", bson.D{{"slice", []interface{}{"$data", startIndex, recordPerPage}}}},
+				}
+			}
+		}
+
+		result, err := menuCollection.Aggregate(ctx, mongo.Pipeline{matchStage, groupStage, projectStage})
+		defer cancel()
+
+		if err != nil{
+			msg := "error occuerd while listing menus"
+			c.JSON(http.StatusInternalServerError, gin.H{"error", msg})
+			return
+		}
+
+		var allMenus []bson.M
+		if err = result.All(ctx, &allMenus); err != nil{
+			log.Fatal(err)
+		}
+
+		c.JSON(http.StatusOK, allMenus[0])
+
+	}
 }
 
 func GetMenu() gin.HandlerFunc{
@@ -126,12 +172,13 @@ func UpdateMenu() gin.HandlerFunc{
 			&opt
 
 			if err!=nil{
-				msg:="Menu update failed"
+				msg := "Menu update failed"
 				c.Json(http.StatusInternalServerError, gin.H{"error":msg})
+				return
 			}
 
 			defer cancel()
-			c.JSON(http.statusOk, result)
+			c.JSON(http.StatusOk, result)
 		)
 
 		}
