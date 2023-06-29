@@ -150,7 +150,7 @@ func UpdateFood() gin.HandlerFunc{
 		foodId := c.Param("food_id")
 
 		if err := c.BindJSON(&food); err != nil{
-			c.JSON(http.StatusBadRequest, gin.H{"error", err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
